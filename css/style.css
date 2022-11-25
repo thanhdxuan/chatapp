@@ -11,9 +11,9 @@ body {
 }
 
 .top {
-    height: 130px;
+    height: 110px;
     width: 100%;
-    background-color: #009688;
+    background-color: #4f58e6;
     position: fixed;
     z-index: -1;
 }
