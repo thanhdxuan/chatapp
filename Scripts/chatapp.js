@@ -80,7 +80,9 @@ connection.onmessage = function (message) {
         case "server_login":
             onLogin(data.success);
             break;
-
+        case "server_register":
+            onRegister(data.success);
+            break;
         case "server_offer":
             onOffer(data.offer, data.name);
             break;
@@ -145,18 +147,30 @@ connection.onmessage = function (message) {
   * This function will handle the login from UI
   * If it is success, it will initiate the connection.
   */
- form.addEventListener('submit', (event) => {
-     // stop form submission
-     event.preventDefault();
-     // handle the form data
-     var username_obj = form.elements['Userame'];
-     username = username_obj.value; 
-     document.getElementById('divChatName_username').innerHTML = username;
-     send({
-         type: "login",
-         name: username
-     });
- });
+form.addEventListener('submit', (event) => {
+    // stop form submission
+    event.preventDefault();
+    // handle the form data
+    var username = form.elements['Userame'].value;
+    var password = form.elements['Password'].value;
+    if (form.elements['Repeat Password']) {
+        repassword = form.elements['Repeat Password'].value;
+        send({
+            type: "register",
+            name: username,
+            password: password,
+            repwd: repassword
+        })
+    } else {
+        document.getElementById('divChatName_username').innerHTML = username;
+        send({
+            type: "login",
+            name: username,
+            password: password
+        });
+    }
+
+});
 /*********************************************************************
  *  WebRTC related Functions (Creation of RTC peer connection, Offer, ICE, SDP, Answer etc..)
  **********************************************************************/
@@ -410,12 +424,23 @@ function onCandidate(candidate) {
  * This function will handle the login message from server
  * If it is success, it will initiate the webRTC RTCPeerconnection.
  */
- function onLogin(success) {
-    if (success === false) {
-        alert("Username is already taken .. choose different one");
+function onLogin(success) {
+    if (success === 0) {
+        alert("This username is not exist");
+    } else if (success === -1) {
+        alert("Wrong password");
     } else {
-        Update_user_status("clientuser_status","online");
+        Update_user_status("clientuser_status", "online");
         document.getElementById('signupStart').setAttribute('style', 'display:none');
+    }
+}
+function onRegister(success) {
+    if (success === 0) {
+        alert("Username is already taken .. choose different one!");
+    } else if (success === -1) {
+        alert("Wrong repeat password!")
+    } else {
+        alert("Register successful");
     }
 }
 /**

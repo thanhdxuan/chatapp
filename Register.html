@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <meta charset="utf-8" />
+    <title>WebRTC Chat App</title>
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="stylesheet" href="https://use.fontawesome.com/releases/v5.6.3/css/all.css">
+    <link href="css/bootstrap-4.3.1.min.css" rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
+    <link href="css/style.css" rel="stylesheet" />
+</head>
+
+<body>
+    <span class="top"></span>
+    <!--Div for Login page -->
+    <div id="signupStart" class="login-dark">
+        <form method="post" id="signup">
+            <h2 class="sr-only">Register Form</h2>
+            <div class="illustration"><i class="material-icons md-148">lock</i></div>
+            <div class="form-group"><input class="form-control" required="" name="Userame" placeholder="Userame"></div>
+            <div class="form-group"><input class="form-control" type="password" required="" name="Password" placeholder="Password"></div>
+            <div class="form-group"><input class="form-control" type="password" required="" name="Repeat Password" placeholder="Repeat Password"></div>
+            <div class="form-group"><button class="btn btn-primary btn-block" type="submit">Register</button></div>
+            <a href="index.html">Log in</a>
+            <p id="loginerror" style="color: red;" class="forgot"></p>
+        </form>
+    </div>
+    <!-- Modal for incoming call -->
+    <div class="modal" id="incoming_call_Modal" tabindex="-1" role="dialog" aria-labelledby="myModalLabel1"
+         aria-hidden="true" data-keyboard="false"></div>
+    <!-- Modal for progress -->
+    <div class="modal" id="modalNotificationList" tabindex="-1" role="dialog" aria-labelledby="myModalLabel2"
+         aria-hidden="true" data-keyboard="false"></div>
+
+    <script src="Scripts/jquery-3.4.1.min.js"></script>
+    <script src="Scripts/popper-1.14.7.min.js"></script>
+    <script src="Scripts/bootstrap-4.3.1.min.js"></script>
+    <script src="Scripts/chatapp.js"></script>
+</body>
+</html>

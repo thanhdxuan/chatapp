@@ -5,6 +5,7 @@
 /* library for websocket */
 var WebSocketServer = require('ws').Server;
 var wss = new WebSocketServer({ port: 8886 });
+const reader = require('xlsx')
 /* to store the connection details */
 var users = {};
 /* to store the user list details */
@@ -28,32 +29,46 @@ wss.on('connection', function (connection) {
 					/* login request from client */
 				case "login":
 					/* If anyone login with same user name - refuse the connection */
-					if (users[data.name]) {
-						/* Already same username has logged in the server */
-						/* send response to client back with login failed */
-						sendTo(connection, { type: "server_login", success: false });
+					let checkData = checkDatabase(data.name, data.password);
+					if (checkData === 0) {
+						sendTo(connection, { type: "server_login", success: 0 });
 						console.log("login failed");
-	
+
+					} else if (checkData === -1) {
+						sendTo(connection, { type: "server_login", success: -1 });
+						console.log("login failed");
 					} else {
 						/* store the connection details */
 						users[data.name] = connection;
 						connection.name = data.name;
 						connection.otherName = null;
 						/* store the connection name in the userlist */
-						map.set(data.name,'online');
+						map.set(data.name, 'online');
 						/* send response to client back with login sucess */
-						sendTo(connection, { type: "server_login", success: true });
+						sendTo(connection, { type: "server_login", success: 1 });
 						console.log("Login sucess");
 						/* send updated user lists to all users */
 						const obj = Object.fromEntries(map);
-	
+
 						for (var i in users) {
-							sendUpdatedUserlist(users[i],[...map]);
+							sendUpdatedUserlist(users[i], [...map]);
 						}
 					}
-	
 					break;
-	
+				case "register":
+					let checkName = checkDatabase(data.name, '');
+					if (checkName != 0) {
+						sendTo(connection, { type: "server_register", success: 0 });
+						console.log("Register failed");
+					} else if (data.repwd != data.password) {
+						sendTo(connection, { type: "server_register", success: -1 });
+						console.log("Register failed")
+					} else {
+						updateDatabase(data.name, data.password);
+						sendTo(connection, { type: "server_register", success: 1 });
+						console.log("Register sucess");
+					}
+					break;
 					/* Offer request from client*/
 				case "offer":
 					/* Check the peer user has logged in the server */
@@ -269,4 +284,42 @@ function checkisJson(str) {
         return false;
     }
     return true;
+}
+
+function updateDatabase(username, password) {
+	let database = []
+	try {
+		var file = reader.readFile('Database.xlsx')
+		reader.utils.sheet_to_json(file.Sheets['Database']).forEach((res) => {
+			database.push(res)
+		})
+	}
+	catch (err) {
+	}
+	database[database.length] = { Username: username, Password: password }
+	const ws = reader.utils.json_to_sheet(database)
+	const wb = reader.utils.book_new()
+	reader.utils.book_append_sheet(wb, ws, 'Database')
+	reader.writeFile(wb, 'Database.xlsx')
+}
+function checkDatabase(username, pwd) {
+	try {
+		var file = reader.readFile('Database.xlsx')
+		let database = []
+		reader.utils.sheet_to_json(file.Sheets['Database']).forEach((res) => {
+			database.push(res)
+		})
+		for (var i = 0; i < database.length; i++) {
+			if (database[i].Username === username) {
+				if (database[i].Password != pwd) {
+					return -1;
+				}
+				else return 1;
+			}
+		}
+		return 0;
+	}
+	catch (err) {
+		return 0;
+	}
 }

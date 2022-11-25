@@ -46,7 +46,11 @@ class WebSocketServer extends EventEmitter {
    * @param {Number} [options.port] The port where to bind the server
    * @param {(http.Server|https.Server)} [options.server] A pre-created HTTP/S
    *     server to use
+   * @param {Boolean} [options.skipUTF8Validation=false] Specifies whether or
+   *     not to skip UTF-8 validation for text and close messages
    * @param {Function} [options.verifyClient] A hook to reject connections
+   * @param {Function} [options.WebSocket=WebSocket] Specifies the `WebSocket`
+   *     class to use. It must be the `WebSocket` class or class that extends it
    * @param {Function} [callback] A listener for the `listening` event
    */
   constructor(options, callback) {
@@ -54,6 +58,7 @@ class WebSocketServer extends EventEmitter {
 
     options = {
       maxPayload: 100 * 1024 * 1024,
+      skipUTF8Validation: false,
       perMessageDeflate: false,
       handleProtocols: null,
       clientTracking: true,
@@ -64,6 +69,7 @@ class WebSocketServer extends EventEmitter {
       host: null,
       path: null,
       port: null,
+      WebSocket,
       ...options
     };
 
@@ -224,21 +230,36 @@ class WebSocketServer extends EventEmitter {
   handleUpgrade(req, socket, head, cb) {
     socket.on('error', socketOnError);
 
-    const key =
-      req.headers['sec-websocket-key'] !== undefined
-        ? req.headers['sec-websocket-key']
-        : false;
+    const key = req.headers['sec-websocket-key'];
     const version = +req.headers['sec-websocket-version'];
 
-    if (
-      req.method !== 'GET' ||
-      req.headers.upgrade.toLowerCase() !== 'websocket' ||
-      !key ||
-      !keyRegex.test(key) ||
-      (version !== 8 && version !== 13) ||
-      !this.shouldHandle(req)
-    ) {
-      return abortHandshake(socket, 400);
+    if (req.method !== 'GET') {
+      const message = 'Invalid HTTP method';
+      abortHandshakeOrEmitwsClientError(this, req, socket, 405, message);
+      return;
+    }
+
+    if (req.headers.upgrade.toLowerCase() !== 'websocket') {
+      const message = 'Invalid Upgrade header';
+      abortHandshakeOrEmitwsClientError(this, req, socket, 400, message);
+      return;
+    }
+
+    if (!key || !keyRegex.test(key)) {
+      const message = 'Missing or invalid Sec-WebSocket-Key header';
+      abortHandshakeOrEmitwsClientError(this, req, socket, 400, message);
+      return;
+    }
+
+    if (version !== 8 && version !== 13) {
+      const message = 'Missing or invalid Sec-WebSocket-Version header';
+      abortHandshakeOrEmitwsClientError(this, req, socket, 400, message);
+      return;
+    }
+
+    if (!this.shouldHandle(req)) {
+      abortHandshake(socket, 400);
+      return;
     }
 
     const secWebSocketProtocol = req.headers['sec-websocket-protocol'];
@@ -248,7 +269,9 @@ class WebSocketServer extends EventEmitter {
       try {
         protocols = subprotocol.parse(secWebSocketProtocol);
       } catch (err) {
-        return abortHandshake(socket, 400);
+        const message = 'Invalid Sec-WebSocket-Protocol header';
+        abortHandshakeOrEmitwsClientError(this, req, socket, 400, message);
+        return;
       }
     }
 
@@ -273,7 +296,10 @@ class WebSocketServer extends EventEmitter {
           extensions[PerMessageDeflate.extensionName] = perMessageDeflate;
         }
       } catch (err) {
-        return abortHandshake(socket, 400);
+        const message =
+          'Invalid or unacceptable Sec-WebSocket-Extensions header';
+        abortHandshakeOrEmitwsClientError(this, req, socket, 400, message);
+        return;
       }
     }
 
@@ -353,7 +379,7 @@ class WebSocketServer extends EventEmitter {
       `Sec-WebSocket-Accept: ${digest}`
     ];
 
-    const ws = new WebSocket(null);
+    const ws = new this.options.WebSocket(null);
 
     if (protocols.size) {
       //
@@ -386,7 +412,10 @@ class WebSocketServer extends EventEmitter {
     socket.write(headers.concat('\r\n').join('\r\n'));
     socket.removeListener('error', socketOnError);
 
-    ws.setSocket(socket, head, this.options.maxPayload);
+    ws.setSocket(socket, head, {
+      maxPayload: this.options.maxPayload,
+      skipUTF8Validation: this.options.skipUTF8Validation
+    });
 
     if (this.clients) {
       this.clients.add(ws);
@@ -437,7 +466,7 @@ function emitClose(server) {
 }
 
 /**
- * Handle premature socket errors.
+ * Handle socket errors.
  *
  * @private
  */
@@ -455,25 +484,52 @@ function socketOnError() {
  * @private
  */
 function abortHandshake(socket, code, message, headers) {
-  if (socket.writable) {
-    message = message || http.STATUS_CODES[code];
-    headers = {
-      Connection: 'close',
-      'Content-Type': 'text/html',
-      'Content-Length': Buffer.byteLength(message),
-      ...headers
-    };
+  //
+  // The socket is writable unless the user destroyed or ended it before calling
+  // `server.handleUpgrade()` or in the `verifyClient` function, which is a user
+  // error. Handling this does not make much sense as the worst that can happen
+  // is that some of the data written by the user might be discarded due to the
+  // call to `socket.end()` below, which triggers an `'error'` event that in
+  // turn causes the socket to be destroyed.
+  //
+  message = message || http.STATUS_CODES[code];
+  headers = {
+    Connection: 'close',
+    'Content-Type': 'text/html',
+    'Content-Length': Buffer.byteLength(message),
+    ...headers
+  };
 
-    socket.write(
-      `HTTP/1.1 ${code} ${http.STATUS_CODES[code]}\r\n` +
-        Object.keys(headers)
-          .map((h) => `${h}: ${headers[h]}`)
-          .join('\r\n') +
-        '\r\n\r\n' +
-        message
-    );
+  socket.once('finish', socket.destroy);
+
+  socket.end(
+    `HTTP/1.1 ${code} ${http.STATUS_CODES[code]}\r\n` +
+      Object.keys(headers)
+        .map((h) => `${h}: ${headers[h]}`)
+        .join('\r\n') +
+      '\r\n\r\n' +
+      message
+  );
+}
+
+/**
+ * Emit a `'wsClientError'` event on a `WebSocketServer` if there is at least
+ * one listener for it, otherwise call `abortHandshake()`.
+ *
+ * @param {WebSocketServer} server The WebSocket server
+ * @param {http.IncomingMessage} req The request object
+ * @param {(net.Socket|tls.Socket)} socket The socket of the upgrade request
+ * @param {Number} code The HTTP response status code
+ * @param {String} message The HTTP response body
+ * @private
+ */
+function abortHandshakeOrEmitwsClientError(server, req, socket, code, message) {
+  if (server.listenerCount('wsClientError')) {
+    const err = new Error(message);
+    Error.captureStackTrace(err, abortHandshakeOrEmitwsClientError);
+
+    server.emit('wsClientError', err, socket, req);
+  } else {
+    abortHandshake(socket, code, message);
   }
-
-  socket.removeListener('error', socketOnError);
-  socket.destroy();
 }
