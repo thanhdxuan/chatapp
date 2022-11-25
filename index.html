@@ -89,6 +89,10 @@
                             <div class="col-2 col-md-1" style="cursor:pointer;">
                                 <i class="far fa-grin fa-2x" onclick="showEmojiPanel()"></i>
                             </div>
+                            <div class="mb-3">
+                                <i class="fas fa-file-import fa-2x" onclick="showChooseFilePanel()" style="cursor:pointer"></i>
+                                <input class="form-control" type="file" id="fileInput" onchange= "SendMessage()" hidden = 'hidden'>
+                              </div>
                             <div class="col-8 col-md-9">
                                 <input id="txtMessage" onkeyup="ChangeSendIcon(this)" type="text"
                                     onfocus="hideEmojiPanel()" placeholder="Type here"

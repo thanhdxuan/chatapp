@@ -8,6 +8,14 @@ var conn_answer;
 var flag_send_datachannel;
 var tm;
 var id_wordflick;
+let fileReader;
+let sendFileChannel;
+const fileInput = document.querySelector('input#fileInput');
+var filemsg = document.getElementById('fileInput');
+var msgList = document.getElementById('messages');
+let receiveBuffer = [];
+var fileInfo = {};
+var receivedSize = 0;
 /*********************************************************************
  * Client - Sever Ping-Pong 
 **********************************************************************/
@@ -155,6 +163,14 @@ connection.onmessage = function (message) {
 /**
  * This function will handle the data channel open callback.
  */
+ function isJson(str) {
+    try {
+        JSON.parse(str);
+    } catch (e) {
+        return false;
+    }
+    return true;
+}
  var onReceive_ChannelOpenState = function (event) {
     flag_send_datachannel = false;
     console.log("dataChannel.OnOpen", event);
@@ -166,8 +182,14 @@ connection.onmessage = function (message) {
 /**
  * This function will handle the data channel message callback.
  */
-var onReceive_ChannelMessageCallback = function (event) {
+ var onReceive_ChannelMessageCallback = function (event) {
     console.log("dataChannel.OnMessage:", event);
+    if (typeof event.data == 'string' && isJson(event.data)) {
+        const data = JSON.parse(event.data);
+        console.log(data);
+        fileInfo = data;
+        return;
+    }
     UpdateChatMessages(event.data, false);
 };
 /**
@@ -257,6 +279,12 @@ function icecandidateAdded(ev) {
  */
  var onSend_ChannelMessageCallback = function (event) {
     console.log("dataChannel.OnMessage:", event);
+    if (typeof event.data == 'string' && isJson(event.data)) {
+        const data = JSON.parse(event.data);
+        console.log(data);
+        fileInfo = data;
+        return;
+    }
     UpdateChatMessages(event.data, false);
 };
 /**
@@ -285,6 +313,7 @@ function Create_DataChannel(name) {
 
     var channelname = "webrtc_label_" + name;
     Send_dataChannel = peerConnection.createDataChannel(channelname, dataChannelOptions);
+    Send_dataChannel.binaryType = 'arraybuffer';
     console.log("Created DataChannel dataChannel = "+Send_dataChannel);
 
     Send_dataChannel.onerror = onSend_ChannelErrorState;
@@ -856,6 +885,9 @@ function showEmojiPanel() {
         hideEmojiPanel();
     }
 }
+function showChooseFilePanel() {
+    document.getElementById('fileInput').click();
+}
 /**
  * This function will hide the emoji panel.
  */
@@ -873,44 +905,91 @@ function getEmoji(control) {
  * This function will update the messages when user type any of 
  * the text and press enter/click send.
  */
-function UpdateChatMessages(txtmessage, client) {
+ function UpdateChatMessages(txtmessage, client) {
 
     var messageDisplay = '';
-
-    if (client == true) {
-        messageDisplay += "<div class='row'>" +
-            "<div class='col-2 col-sm-1 col-md-1'>" +
-            "<img src='images/pp.png' class='chat-pic rounded-circle' />" +
-            "</div>" +
-            "<div class='col-6 col-sm-7 col-md-7'>" +
-            "<p class='receive'>" + txtmessage + "</p>" +
-            "</div>" +
-            "</div>";
-
-        document.getElementById('messages').innerHTML += messageDisplay;
+    if (typeof txtmessage == 'object') { //Update file
+        console.log("UPDATE------------");
+        receivedSize += txtmessage.byteLength;
+        receiveBuffer.push(txtmessage);
+        if (receivedSize == fileInfo.size) {
+            const received = new Blob(receiveBuffer);
+            receiveBuffer = [];
+            receivedSize = 0;
+            var fileUrl = URL.createObjectURL(received);
+            //--create
+            if (client == true) {
+                messageDisplay += "<div class='row'>" +
+                "<div class='col-2 col-sm-1 col-md-1'>" +
+                "<img src='images/pp.png' class='chat-pic rounded-circle' />" +
+                "</div>" +
+                "<div class='col-6 col-sm-7 col-md-7'>" +
+                "<a class='receive' id='download'"+ "download=" + fileInfo.name + " href = " + fileUrl +  ">" + fileInfo.name + "</a>" +
+                "</div>" +
+                "</div>";
+                document.getElementById('messages').innerHTML += messageDisplay;
+            }
+            else {
+                messageDisplay += "<div class='row justify-content-end'>" +
+                "<div class='col-6 col-sm-7 col-md-7'>" +
+                "<a class='sent float-right' id='download'" + "download=" + fileInfo.name + " href = " + fileUrl +  ">" + fileInfo.name +"</a>" +
+                "</div>" +
+                "<div class='col-2 col-sm-1 col-md-1'>" +
+                "<img src='images/pp.png' class='chat-pic rounded-circle'/>" +
+                "</div>" +
+                "</div>";
+                document.getElementById('messages').innerHTML += messageDisplay;
+            }
+        }
     }
     else {
-        messageDisplay += "<div class='row justify-content-end'>" +
-            "<div class='col-6 col-sm-7 col-md-7'>" +
-            "<p class='sent float-right'>" + txtmessage + "</p>" +
-            "</div>" +
-            "<div class='col-2 col-sm-1 col-md-1'>" +
-            "<img src='images/pp.png' class='chat-pic rounded-circle'/>" +
-            "</div>" +
-            "</div>";
-
-        document.getElementById('messages').innerHTML += messageDisplay;
+        if (client == true) {
+            messageDisplay += "<div class='row'>" +
+                "<div class='col-2 col-sm-1 col-md-1'>" +
+                "<img src='images/pp.png' class='chat-pic rounded-circle' />" +
+                "</div>" +
+                "<div class='col-6 col-sm-7 col-md-7'>" +
+                "<p class='receive'>" + txtmessage + "</p>" +
+                "</div>" +
+                "</div>";
+    
+            document.getElementById('messages').innerHTML += messageDisplay;
+        }
+        else {
+            messageDisplay += "<div class='row justify-content-end'>" +
+                "<div class='col-6 col-sm-7 col-md-7'>" +
+                "<p class='sent float-right'>" + txtmessage + "</p>" +
+                "</div>" +
+                "<div class='col-2 col-sm-1 col-md-1'>" +
+                "<img src='images/pp.png' class='chat-pic rounded-circle'/>" +
+                "</div>" +
+                "</div>";
+    
+            document.getElementById('messages').innerHTML += messageDisplay;
+        }
     }
+    filemsg.value = '';
     document.getElementById('messages').scrollTo(0, document.getElementById('messages').scrollHeight);
 }
 /**
  * This function will send the messages with webRTC data channel.
  */
-function SendMessage() {
+ function SendMessage() {
 
     var txtmessage = document.getElementById('txtMessage').value;
-    if (txtmessage != '') {
 
+    if (filemsg.value != '') {
+        const file = fileInput.files[0];
+        const fileInfo = {name: file.name, size: file.size, type: file.type, time: file.lastModified};
+        if (flag_send_datachannel == true) {
+            Send_dataChannel.send(JSON.stringify(fileInfo));
+        }
+        else {
+            Receive_dataChannel.send(JSON.stringify(fileInfo));
+        }
+        sendData();
+    }
+    if (txtmessage != '') {
         if (flag_send_datachannel == true) {
             Send_dataChannel.send(txtmessage);
             UpdateChatMessages(txtmessage, true);
@@ -932,6 +1011,50 @@ function SendMessage() {
         }
     }
 }
+function sendData() {
+    
+    const file = fileInput.files[0];
+    console.log(`File is ${[file.name, file.size, file.type, file.lastModified].join(' ')}`);
+    // Handle 0 size files.
+    if (file.size === 0) {
+      return;
+    }
+    const chunkSize = 16384;
+    fileReader = new FileReader();
+    let offset = 0;
+    fileReader.addEventListener('error', error => console.error('Error reading file:', error));
+    fileReader.addEventListener('abort', event => console.log('File reading aborted:', event));
+    fileReader.addEventListener('load', e => {
+      console.log('FileRead.onload ', e);
+      if (flag_send_datachannel == true) {
+        Send_dataChannel.send(e.target.result);
+        offset += e.target.result.byteLength;
+        if (offset < file.size) {
+          readSlice(offset);
+        }
+      }
+      else if (flag_send_datachannel == false) {
+        Receive_dataChannel.send(e.target.result);
+        offset += e.target.result.byteLength;
+        if (offset < file.size) {
+          readSlice(offset);
+        }
+      }
+      else
+      {
+        update_connection_status("datachannel");
+      }
+    });
+    const readSlice = o => {
+      console.log('readSlice ', o);
+      const slice = file.slice(offset, o + chunkSize);
+      fileReader.readAsArrayBuffer(slice);
+    };
+    readSlice(0);
+    //update -----msg------
+    var updateMsg = file.name + " is sent";
+    UpdateChatMessages(updateMsg, true);
+  }
 /**
  * This function will populate the online userlist from the server.
 */
