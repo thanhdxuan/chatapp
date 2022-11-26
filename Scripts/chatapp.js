@@ -132,7 +132,10 @@ connection.onmessage = function (message) {
 /*********************************************************************
  *  Functions related to Form login 
  **********************************************************************/
- const form  = document.getElementById('signup');
+ const formSignUp  = document.getElementById('signup');
+ const formSignIn = document.getElementById('signin');
+ const registerBtn = document.getElementById('regBtn');
+ const loginBtn = document.getElementById('loginBtn');
  /**
   * This is a click event when press enter from keybord
   * accept key event from keyboard
@@ -147,27 +150,47 @@ connection.onmessage = function (message) {
   * This function will handle the login from UI
   * If it is success, it will initiate the connection.
   */
-form.addEventListener('submit', (event) => {
+ registerBtn.addEventListener('click', (event) => {
+     document.getElementById('signupStart').removeAttribute('style');
+    document.getElementById('signinStart').setAttribute('style', 'display:none');
+ });
+ loginBtn.addEventListener('click', (event) => {
+    document.getElementById('signinStart').removeAttribute('style');
+    document.getElementById('signupStart').setAttribute('style', 'display:none');
+ });
+formSignIn.addEventListener('submit', (event) => {
     // stop form submission
     event.preventDefault();
     // handle the form data
-    var username = form.elements['Userame'].value;
-    var password = form.elements['Password'].value;
-    if (form.elements['Repeat Password']) {
-        repassword = form.elements['Repeat Password'].value;
+    var username_obj = formSignIn.elements['Userame'];
+    var pass = formSignIn.elements['Password'].value;
+    console.log("SignIn:", username_obj, pass);
+    username = username_obj.value; 
+    document.getElementById('divChatName_username').innerHTML = username;
+    send({
+        type: "login",
+        name: username,
+        password: pass
+    });
+
+});
+formSignUp.addEventListener('submit', (event) => {
+    // stop form submission
+    event.preventDefault();
+    // handle the form data
+    var userame_obj = formSignUp.elements['Userame'].value;
+    var pass = formSignUp.elements['Password'].value;
+    if (formSignUp.elements['Repeat Password']) {
+        var repassword = formSignUp.elements['Repeat Password'].value;
         send({
             type: "register",
-            name: username,
-            password: password,
+            name: userame_obj,
+            password: pass,
             repwd: repassword
         })
-    } else {
-        document.getElementById('divChatName_username').innerHTML = username;
-        send({
-            type: "login",
-            name: username,
-            password: password
-        });
+    } 
+    else {
+        console.log("Enter repeat password!");
     }
 
 });
@@ -200,9 +223,15 @@ form.addEventListener('submit', (event) => {
     console.log("dataChannel.OnMessage:", event);
     if (typeof event.data == 'string' && isJson(event.data)) {
         const data = JSON.parse(event.data);
-        console.log(data);
-        fileInfo = data;
-        return;
+        console.log(typeof data);
+        if (typeof data == 'number') {
+            UpdateChatMessages(event.data, false);
+            return;
+        }
+        else {
+            fileInfo = data;
+            return;
+        }
     }
     UpdateChatMessages(event.data, false);
 };
@@ -295,9 +324,15 @@ function icecandidateAdded(ev) {
     console.log("dataChannel.OnMessage:", event);
     if (typeof event.data == 'string' && isJson(event.data)) {
         const data = JSON.parse(event.data);
-        console.log(data);
-        fileInfo = data;
-        return;
+        console.log(typeof data);
+        if (typeof data == 'number') {
+            UpdateChatMessages(event.data, false);
+            return;
+        }
+        else {
+            fileInfo = data;
+            return;
+        }
     }
     UpdateChatMessages(event.data, false);
 };
@@ -431,6 +466,7 @@ function onLogin(success) {
         alert("Wrong password");
     } else {
         Update_user_status("clientuser_status", "online");
+        document.getElementById('signinStart').setAttribute('style', 'display:none');
         document.getElementById('signupStart').setAttribute('style', 'display:none');
     }
 }
@@ -441,6 +477,8 @@ function onRegister(success) {
         alert("Wrong repeat password!")
     } else {
         alert("Register successful");
+        document.getElementById('signinStart').removeAttribute('style');
+        document.getElementById('signupStart').setAttribute('style', 'display:none');
     }
 }
 /**
@@ -1016,6 +1054,7 @@ function getEmoji(control) {
     }
     if (txtmessage != '') {
         if (flag_send_datachannel == true) {
+            console.log("In send chanel: ",txtmessage);
             Send_dataChannel.send(txtmessage);
             UpdateChatMessages(txtmessage, true);
             /* remove current text */
@@ -1024,6 +1063,7 @@ function getEmoji(control) {
         }
         else if (flag_send_datachannel == false)
         {
+            console.log("In receive chanel: ",txtmessage);
             Receive_dataChannel.send(txtmessage);
             UpdateChatMessages(txtmessage, true);
             /* remove current text */
@@ -1097,6 +1137,10 @@ function LoadOnlineUserList(username_array) {
         var id = 0;
 
         for (let [key, value] of map2) {
+            console.log("---------------Userlist-------------");
+            console.log(map2);
+            console.log(username);
+            console.log(key);
             if (username != key) { 
                 var id_name = 'online_status_'+id; /* Used for dynamic id */
                 /*populate the sidebar online users list dynamically*/

@@ -14,15 +14,27 @@
 <body>
     <span class="top"></span>
     <!--Div for Login page -->
-    <div id="signupStart" class="login-dark">
-        <form method="post" id="signup" style= "top : 430px;">
+    <div id="signinStart" class="login-dark">
+        <form method="post" id="signin" style= "top : 430px;">
             <h2 class="sr-only">Login Form</h2>
             <div><img src="images/hcmut.png" style="width :250px;"/></div>
             <div class="form-group"><input class="form-control" required="" name="Userame" placeholder="Userame"></div>
             <div class="form-group"><input class="form-control" type="password" required="" name="Password" placeholder="Password"></div>
             <div class="form-group"><button class="btn btn-primary btn-block" type="submit">Log In</button></div>
-            <a href="Register.html">Register</a>
             <!--Server Down / Login error Message-->
+            <div class="form-group"><button class="btn btn-primary btn-block" id="regBtn" type="button">Register</button></div>
+            <p id="loginerror" style="color: red;" class="forgot"></p>
+        </form>
+    </div>
+    <div id="signupStart" class="login-dark">
+        <form method="post" id="signup" style="top : 430px;">
+            <h2 class="sr-only">Register Form</h2>
+            <div><img src="images/hcmut.png" style="width :250px;" /></div>
+            <div class="form-group"><input class="form-control" required="" name="Userame" placeholder="Userame"></div>
+            <div class="form-group"><input class="form-control" type="password" required="" name="Password" placeholder="Password"></div>
+            <div class="form-group"><input class="form-control" type="password" required="" name="Repeat Password" placeholder="Repeat Password"></div>
+            <div class="form-group"><button class="btn btn-primary btn-block" type="submit">Register</button></div>
+            <div class="form-group"><button class="btn btn-primary btn-block" id="loginBtn" type="button">Log In</button></div>
             <p id="loginerror" style="color: red;" class="forgot"></p>
         </form>
     </div>

@@ -49,7 +49,7 @@ wss.on('connection', function (connection) {
 						console.log("Login sucess");
 						/* send updated user lists to all users */
 						const obj = Object.fromEntries(map);
-
+						console.log(obj);
 						for (var i in users) {
 							sendUpdatedUserlist(users[i], [...map]);
 						}
