@@ -6,6 +6,7 @@
 var WebSocketServer = require('ws').Server;
 var wss = new WebSocketServer({ port: 8886 });
 const reader = require('xlsx')
+const crypto = require('crypto')
 /* to store the connection details */
 var users = {};
 /* to store the user list details */
@@ -36,6 +37,9 @@ wss.on('connection', function (connection) {
 
 					} else if (checkData === -1) {
 						sendTo(connection, { type: "server_login", success: -1 });
+						console.log("login failed");
+					} else if (users[data.name]) {
+						sendTo(connection, { type: "server_login", success: -2 });
 						console.log("login failed");
 					} else {
 						/* store the connection details */
@@ -287,39 +291,40 @@ function checkisJson(str) {
 }
 
 function updateDatabase(username, password) {
-	let database = []
-	try {
-		var file = reader.readFile('Database.xlsx')
-		reader.utils.sheet_to_json(file.Sheets['Database']).forEach((res) => {
-			database.push(res)
-		})
-	}
-	catch (err) {
-	}
-	database[database.length] = { Username: username, Password: password }
-	const ws = reader.utils.json_to_sheet(database)
-	const wb = reader.utils.book_new()
-	reader.utils.book_append_sheet(wb, ws, 'Database')
-	reader.writeFile(wb, 'Database.xlsx')
+    let database = []
+    try {
+        var file = reader.readFile('Database.xlsx')
+        reader.utils.sheet_to_json(file.Sheets['Database']).forEach((res) => {
+            database.push(res)
+        })
+    }
+    catch (err) {
+    }
+    const hashedPwd = crypto.createHmac('sha256', 'Secret').update(password).digest('hex');
+    database[database.length] = { Username: username, Password: hashedPwd }
+    const ws = reader.utils.json_to_sheet(database)
+    const wb = reader.utils.book_new()
+    console.log(ws)
+    reader.utils.book_append_sheet(wb, ws, 'Database')
+    reader.writeFile(wb, 'Database.xlsx');
 }
 function checkDatabase(username, pwd) {
-	try {
-		var file = reader.readFile('Database.xlsx')
-		let database = []
-		reader.utils.sheet_to_json(file.Sheets['Database']).forEach((res) => {
-			database.push(res)
-		})
-		for (var i = 0; i < database.length; i++) {
-			if (database[i].Username === username) {
-				if (database[i].Password != pwd) {
-					return -1;
-				}
-				else return 1;
-			}
-		}
-		return 0;
-	}
-	catch (err) {
-		return 0;
-	}
+       try {
+            var file = reader.readFile('Database.xlsx')
+            let database = []
+            reader.utils.sheet_to_json(file.Sheets['Database']).forEach((res) => {
+                database.push(res)
+            })
+           const hashedPwd = crypto.createHmac('sha256', 'Secret').update(pwd).digest('hex');
+           for (var i = 0; i < database.length; i++) {
+                if (database[i].Username === username) {
+                    if (hashedPwd === database[i].Password) return 1;
+                    else return -1;
+                }
+            }
+            return 0;
+        }
+        catch (err) {
+            return 0;
+    }
 }

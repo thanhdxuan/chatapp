@@ -464,6 +464,8 @@ function onLogin(success) {
         alert("This username is not exist");
     } else if (success === -1) {
         alert("Wrong password");
+    } else if (success === -2) {
+        alert("Your account already login in the other app");
     } else {
         Update_user_status("clientuser_status", "online");
         document.getElementById('signinStart').setAttribute('style', 'display:none');
