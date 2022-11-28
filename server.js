@@ -5,13 +5,14 @@
 /* library for websocket */
 var WebSocketServer = require('ws').Server;
 var wss = new WebSocketServer({ port: 8886 });
-const reader = require('xlsx')
+const { MongoClient } = require('mongodb');
 const crypto = require('crypto')
 /* to store the connection details */
 var users = {};
 /* to store the user list details */
 var map = new Map();
-
+const uri = "mongodb+srv://ChatApp:chatapp@cluster0.uynihxb.mongodb.net/?retryWrites=true&w=majority";
+const client = new MongoClient(uri);
 wss.on('listening', function () {
 	console.log("Server started...");
 });
@@ -19,7 +20,7 @@ wss.on('listening', function () {
 wss.on('connection', function (connection) {
 	/* Sucessful connection */
 	console.log("User has connected");
-	connection.on('message', function (message) {
+	connection.on('message', async function (message) {
 
 		var isjsonstring = checkisJson(message);
 
@@ -30,7 +31,7 @@ wss.on('connection', function (connection) {
 					/* login request from client */
 				case "login":
 					/* If anyone login with same user name - refuse the connection */
-					let checkData = checkDatabase(data.name, data.password);
+					let checkData = await checkDatabase(client, data.name, data.password);
 					if (checkData === 0) {
 						sendTo(connection, { type: "server_login", success: 0 });
 						console.log("login failed");
@@ -60,7 +61,7 @@ wss.on('connection', function (connection) {
 					}
 					break;
 				case "register":
-					let checkName = checkDatabase(data.name, '');
+					let checkName = await checkDatabase(client, data.name, '');
 					if (checkName != 0) {
 						sendTo(connection, { type: "server_register", success: 0 });
 						console.log("Register failed");
@@ -68,7 +69,7 @@ wss.on('connection', function (connection) {
 						sendTo(connection, { type: "server_register", success: -1 });
 						console.log("Register failed")
 					} else {
-						updateDatabase(data.name, data.password);
+						await updateDatabase(client, data.name, data.password);
 						sendTo(connection, { type: "server_register", success: 1 });
 						console.log("Register sucess");
 					}
@@ -290,41 +291,16 @@ function checkisJson(str) {
     return true;
 }
 
-function updateDatabase(username, password) {
-    let database = []
-    try {
-        var file = reader.readFile('Database.xlsx')
-        reader.utils.sheet_to_json(file.Sheets['Database']).forEach((res) => {
-            database.push(res)
-        })
-    }
-    catch (err) {
-    }
-    const hashedPwd = crypto.createHmac('sha256', 'Secret').update(password).digest('hex');
-    database[database.length] = { Username: username, Password: hashedPwd }
-    const ws = reader.utils.json_to_sheet(database)
-    const wb = reader.utils.book_new()
-    console.log(ws)
-    reader.utils.book_append_sheet(wb, ws, 'Database')
-    reader.writeFile(wb, 'Database.xlsx');
+async function updateDatabase(client, username, pwd) {
+	await client.db("Account").collection("data").insertOne({ '_id': username, Password: crypto.createHmac('sha256', 'Secret').update(pwd).digest('hex') });
 }
-function checkDatabase(username, pwd) {
-       try {
-            var file = reader.readFile('Database.xlsx')
-            let database = []
-            reader.utils.sheet_to_json(file.Sheets['Database']).forEach((res) => {
-                database.push(res)
-            })
-           const hashedPwd = crypto.createHmac('sha256', 'Secret').update(pwd).digest('hex');
-           for (var i = 0; i < database.length; i++) {
-                if (database[i].Username === username) {
-                    if (hashedPwd === database[i].Password) return 1;
-                    else return -1;
-                }
-            }
-            return 0;
-        }
-        catch (err) {
-            return 0;
-    }
+
+async function checkDatabase(client, username, pwd) {
+	const check = await client.db("Account").collection("data").findOne({ '_id': username });
+	if (!check) {
+		return 0;
+	}
+	const hashedPwd = crypto.createHmac('sha256', 'Secret').update(pwd).digest('hex');
+	if (hashedPwd === check.Password) return 1;
+	else return -1;
 }
